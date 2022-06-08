@@ -1,0 +1,153 @@
+---
+layout: post
+title: Web Application
+---
+
+## §1. Main Page
+
+We will start by showing how to create the overall flask web application and specifically the main page.  We start by creating the main code document, app.py, which will house our functions and all of the Python code we will use.  Below is the code used to create the project and the main page.  Here is a link to the GitHub repository:  https://github.com/NicholasDelianedis/HW5App
+
+```python
+from flask import Flask, render_template, request, g
+from flask import redirect, url_for, abort
+import sqlite3
+import os # import necessary items
+
+app = Flask(__name__) # create flask
+gidcount = 0 # create global id count for later
+
+@app.route("/") # create main page
+def main():
+    return render_template('main.html') # render main template
+```
+
+So we start by importing all of the modules that we will need, including Flask, then create the app with Flask, and then define a function for the overall site where we render the template 'main.html'.  Now we will look at that template.
+
+![Blog-5-main-html.png]({{ site.baseurl }}/images/Blog-5-main-html.png)
+
+The first line in this template refers to 'base.html', which, as we will see in a moment, sets up the navigation section on each page.  Then, we have our title in the block header, and the content in the block content, which in this case is just a welcome statement.  Now we will look at 'base.html'
+
+![Blog-5-base.png]({{ site.baseurl }}/images/Blog-5-base.png)
+
+In this template, we have a statement stating the document type, html, then a head section which refers the application to the style sheet in the static folder, which we will come back to near the end of this blog post, and then the code for the navigation section, under the nav tag.  It contains the title, and links to the three main pages.  It also contains a section for the content of the page, which is filled in by the other templates for each page.
+
+The main page, as constructed here, is shown below:
+
+![Blog-5-Main.png]({{ site.baseurl }}/images/Blog-5-Main.png)
+
+## §2. Submit Page
+
+Next, we will show the submit page.  This page will accept submissions from users of their preferred handle, and a message from them.  Here is the code that implements this page from app.py:
+
+```python
+@app.route('/submit/', methods=['POST', 'GET']) # route to submit page
+def submit():
+    if request.method == 'GET': # if user wants to retrieve page
+        return render_template('submit.html') # render template
+    else: # if user wants to submit a message
+        try:
+            insert_message(request) # try adding info to database and return database successfully
+
+            return render_template('submit.html', thanks=True)
+        except: # otherwise give an error message
+            return render_template('submit.html', error=True)
+```
+
+This function routes the user to the submit page, and then renders the template based on the user's intent, with it rendering 'submit.html' each time, but giving different inputs also if the user successfully submits information, where the template will thank the user, and where it will give the user an error message if something goes wrong.  It also tries to run the insert_message function, which will be explained below.
+
+```python
+def insert_message(request):
+    conn = get_message_db() # connect to database
+    handle = request.form["name"] # get handle from form
+    message = request.form["message"] # get message from form
+    global gidcount # specify global gidcount from beginning
+    gidcount += 1 # increment gidcount
+    newid = gidcount # set newid to gidcount
+    cmd = \
+    '''
+    INSERT INTO `messages`
+    VALUES (?, ?, ?);
+    ''' # sql command to insert into database
+    cursor = conn.cursor()
+    cursor.execute(cmd, (newid, handle, message))
+    conn.commit()
+    conn.close() # close connection
+```
+
+This function inserts the message and handle into the database, where we use gidcount from above as a global id count, so that we can keep track of the number of responses outside of the function.  We get the database by calling the get_message_db function, which will be shown below, and then use sql commands to insert the id, handle, and message into the database, and finally commit the change and close the connection.
+
+```python
+def get_message_db():
+    try: # try returning the database
+        return g.message_db
+    except: # if database does not exist, create it
+        g.message_db = sqlite3.connect("messages_db.sqlite")
+        cmd = \
+        '''
+        CREATE TABLE IF NOT EXISTS `messages` (
+            id int,
+            handle varchar(255),
+            message varchar(255)
+            );
+        '''
+        cursor = g.message_db.cursor()
+        cursor.execute(cmd) # sql command to create database
+        return g.message_db
+```
+
+This function retrieves the database, and creates it if it does not exist using a sql command to create the table, and then to return the table in either case.  Now we will look at the 'submit.html' template, which we alluded to earlier, which handles the rest of the functionality of the submit page.
+
+![Blog-5-submit-html.png]({{ site.baseurl }}/images/Blog-5-submit-html.png)
+
+This html template starts by rendering the title of 'Submit' at the top of the page, and then renders the form with the questions under the content block.  The form allows users to enter information into the two boxes, and saves them under request.form, with 'name' and 'message' being the two columns the information is saved under.  Then it also has if statements that give a thanks message if the template is called with the thanks variable set to True, and an error message if that variable is set to true.  Here is what the submit page looks like on the website:
+
+![Blog-5-Submit.png]({{ site.baseurl }}/images/Blog-5-Submit.png)
+
+## §3. View Page
+
+Next, we will look at the view page.  We will start by looking at the code that routes users to the view page and renders the template.
+
+```python
+@app.route('/view/', methods=['POST', 'GET'])
+def view():
+    if request.method == 'GET': # if user goes to view page, render template
+        return render_template('view.html')
+    else: # if user wants to view messages
+        try: # try viewing messages
+            msg = random_message(request.form['num']) # get specific number of messages
+            return render_template('view.html', valid=True, msg=msg) # render template with messages
+        except: # return error message if try does not work
+            return render_template('view.html', error=True)
+```
+
+This function routes viewers to the view page, and calls the random_message function, which will be shown below, and returns the template either with the results from that function, or with an error message using a try statement.  Here is the code for the random_message function below.
+
+```python
+def random_message(n):
+    conn = get_message_db() # connect to database
+    cmd = \
+    '''
+    SELECT * FROM messages ORDER BY RANDOM() LIMIT ?;
+    ''' # sql command to get random order of n messages
+    cursor = conn.cursor()
+    cursor.execute(cmd, (n,))
+    msg = cursor.fetchall()
+    conn.close() # execute, close cursor
+    return msg # return info
+```
+
+Now we will look at the 'view.html' template, which takes the info from msg and renders it onto the template.
+
+![Blog-5-view-html.png]({{ site.baseurl }}/images/Blog-5-view-html.png)
+
+We see that this extends the base template, as all our templates do, and has a title of 'View Messages', and then in the content block, the template asks for the number of messages the user would like to view.  Then, if there was no error, the template renders each message as the message, a hyphen, and the user in a for loop over all selected messages, which displays them.  The end result of the view page is shown below, where the message from earlier is shown, as well as another message, after typing '2' into the box.
+
+![Blog-5-View.png]({{ site.baseurl }}/images/Blog-5-View.png)
+
+## §4. Style Sheet
+
+Now we will show a snippet of the 'style.css' sheet, which gives the website non-standard finishes.  Here is the first part of the sheet, which is all we will discuss in this blog post.
+
+![Blog-5-style-css.png]({{ site.baseurl }}/images/Blog-5-style-css.png)
+
+This is mostly just a standard style sheet, and the spefic features of this website that are easily shown are the colors, which, as you can see, have been changed to different shades of blue and gold, as well as the font, which has been changed into the Times New Roman family.
