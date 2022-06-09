@@ -235,3 +235,70 @@ def transcript_fetch(df):
 ```
 
 Notably, the Fiscal Period returned by the API is actually a not-too-well-documented object, not a string, and so required an uncomfortable amount of hacky syntax to coax say, the numeric only “1”  string out of a Q1 fiscal period OBJ.
+
+![GS-df.png]({{ site.baseurl }}/images/GS-df.png)
+
+## §2.4 Sentiment Analysis
+
+From here, largely on account of our late-dropping group member, we had to curtail our pulls to random samples (n=1000 and n=2000). However, we did have nice syntax prepared to tokenize and core the text using our sentiment dictionaries and add these elements as new rows to our dataframe:
+
+```python
+
+import pandas as pd
+from nltk.tokenize import WordPunctTokenizer as wpt
+```
+
+```python
+
+import nltk
+ 
+nltk.download("opinion_lexicon")
+ 
+from nltk.corpus import opinion_lexicon
+ 
+pos_list=list(opinion_lexicon.positive())
+neg_list=list(opinion_lexicon.negative())
+print(pos_list)
+
+```
+
+```python
+
+#for each transcript
+for transcript in final_sample["Transcript"]:
+ 
+ # Tokenize the words and convert to lowercase
+ text = transcript.split()
+ text = [text.lower() for text in text]
+ 
+ # Remove the stopwords
+ text_clean = [word for word in text if word not in stopwords]
+ 
+ words_pos = [word for word in text_clean if word in pos_list]
+ words_neg = [word for word in text_clean if word in neg_list]
+ 
+ pos_score = len(words_pos)
+ neg_score = len(words_neg)
+ 
+ tokens = lm.tokenize(transcript)
+ score = lm.get_score(tokens)
+ 
+ final_sample.loc[((final_sample["Transcript"] == transcript), 'Positive')] = pos_score
+ final_sample.loc[((final_sample["Transcript"] == transcript), 'Negative')] = neg_score
+ final_sample.loc[((final_sample["Transcript"] == transcript), 'Ratio')] = pos_score / neg_score
+ 
+```
+ 
+We then used seaborn to plot the relationship between positive, negative, and pos/neg ratio scores and our target variable of DeltaPrice:
+
+![GS-s1.png]({{ site.baseurl }}/images/GS-s1.png)
+![GS-s2.png]({{ site.baseurl }}/images/GS-s2.png)
+![GS-s3.png]({{ site.baseurl }}/images/GS-s3.png)
+
+We also plotted the technology sector in isolation and noticed a curious group of points where “no bad news” seemed to be more strongly correlated with DeltaPrice than actual positive sentiment or even the ratio of positive to negative sentiment:
+
+![GS-s4.png]({{ site.baseurl }}/images/GS-s4.png)
+
+## §3 Conclusion
+
+We found that recurrent neural networks do not work very well on stock data, and that our linear regression model does surprisingly well. On the sentiment side, the plotted results were very much undermined by the lack of time to run full 36,000+ row pulls. The random samples undermined any patterns found within the time series of a particular company for both the sentiment analysis and the neural networks. Ideally, moving forward we would run a complete S&P 500 pull (to avoid potential noise from small-caps), and precluding reports from the period of extreme Fed Quantitative Easing in response to COVID (or isolating and analyzing them separately).  Similarly, we would like to follow through with our original intent to both run a neural network model on  vectorized transcript text and to see the effect of the inclusion of sentiment scores as features within our most successful numeric model. 
